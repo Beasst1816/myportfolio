@@ -1,0 +1,58 @@
+# Builds Flutter web and publishes to GitHub Pages.
+# After merging, set: Repo → Settings → Pages → Source: GitHub Actions (not "branch").
+
+name: Deploy Flutter Web to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Project site: https://<user>.github.io/<repo>/
+      - name: Build web
+        run: flutter build web --release --base-href /myportfolio/
+
+      - name: Disable Jekyll (Flutter web on GitHub Pages)
+        run: touch build/web/.nojekyll
+
+      # v3 includes dotfiles (e.g. .nojekyll). v4 omits them, which breaks Flutter on Pages.
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
